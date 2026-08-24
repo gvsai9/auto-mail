@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Cookie, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 from app.config.settings import settings
-from app.infrastructure.auth.google_credentials import GoogleCredentialStore
+from app.infrastructure.auth.session_store import create_session
 
 
 router = APIRouter(
@@ -22,8 +22,17 @@ SCOPES = [
 
 CLIENT_SECRETS_FILE = "google_client_secret.json"
 
-credential_store = GoogleCredentialStore()
 
+# --------------------------------------------------
+# Temporary OAuth state store
+# --------------------------------------------------
+
+_oauth_store: dict[str, str] = {}
+
+
+# --------------------------------------------------
+# Google Login
+# --------------------------------------------------
 
 @router.get("/google")
 def google_login():
@@ -41,64 +50,70 @@ def google_login():
         prompt="consent",
     )
 
-    response = RedirectResponse(authorization_url)
+    # Store the PKCE verifier against this OAuth state.
+    _oauth_store[state] = flow.code_verifier
 
-    response.set_cookie(
-        key="oauth_state",
-        value=state,
-        httponly=True,
-        secure=False,
-        samesite="lax",
+    print("========== GOOGLE LOGIN ==========")
+    print("Generated state:", state)
+    print(
+        "Generated verifier exists:",
+        flow.code_verifier is not None,
+    )
+    print("OAuth store size:", len(_oauth_store))
+    print("===================================")
+
+    return RedirectResponse(
+        url=authorization_url
     )
 
-    response.set_cookie(
-        key="code_verifier",
-        value=flow.code_verifier,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-    )
 
-    return response
-
+# --------------------------------------------------
+# Google OAuth Callback
+# --------------------------------------------------
 
 @router.get("/google/callback")
 def google_callback(
     code: str,
     state: str,
-    oauth_state: str | None = Cookie(default=None),
-    code_verifier: str | None = Cookie(default=None),
 ):
 
-    # -----------------------------
+    print("========== GOOGLE CALLBACK ==========")
+    print("Google state:", state)
+    print(
+        "State exists in OAuth store:",
+        state in _oauth_store,
+    )
+    print("OAuth store size:", len(_oauth_store))
+    print("=====================================")
+
+    # --------------------------------------------------
     # Validate OAuth state
-    # -----------------------------
+    # --------------------------------------------------
 
-    if oauth_state is None:
+    if state not in _oauth_store:
+
         raise HTTPException(
             status_code=400,
-            detail="Missing OAuth state.",
+            detail=(
+                "Invalid or expired OAuth state. "
+                "Please start Google login again."
+            ),
         )
 
-    if state != oauth_state:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid OAuth state.",
-        )
+    # --------------------------------------------------
+    # Retrieve PKCE verifier
+    # --------------------------------------------------
 
-    # -----------------------------
-    # Validate PKCE verifier
-    # -----------------------------
+    code_verifier = _oauth_store.pop(state)
 
-    if code_verifier is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing PKCE code verifier.",
-        )
+    print(
+        "Code verifier exists:",
+        code_verifier is not None,
+    )
 
-    # -----------------------------
+    # --------------------------------------------------
     # Recreate OAuth flow
-    # -----------------------------
+    # --------------------------------------------------
 
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
@@ -108,15 +123,12 @@ def google_callback(
 
     flow.redirect_uri = settings.google_redirect_uri
 
-    # Important:
-    # The verifier generated during /google
-    # must be reused during the callback.
+    # Reuse the verifier generated during login.
     flow.code_verifier = code_verifier
 
-    # -----------------------------
+    # --------------------------------------------------
     # Exchange authorization code
-    # for Google credentials
-    # -----------------------------
+    # --------------------------------------------------
 
     flow.fetch_token(
         code=code,
@@ -124,9 +136,9 @@ def google_callback(
 
     credentials = flow.credentials
 
-    # -----------------------------
-    # Identify the Gmail account
-    # -----------------------------
+    # --------------------------------------------------
+    # Identify Gmail account
+    # --------------------------------------------------
 
     gmail = build(
         "gmail",
@@ -136,29 +148,39 @@ def google_callback(
 
     profile = (
         gmail.users()
-        .getProfile(userId="me")
+        .getProfile(
+            userId="me"
+        )
         .execute()
     )
 
     user_email = profile["emailAddress"]
 
-    # -----------------------------
-    # Store credentials
-    # -----------------------------
+    print("Authenticated Gmail:", user_email)
 
-    credential_store.save(
-        user_email,
-        credentials,
+    # --------------------------------------------------
+    # Create application session
+    # --------------------------------------------------
+
+    session_id = create_session(
+        credentials
     )
 
-    # -----------------------------
-    # Return success
-    # -----------------------------
+    # --------------------------------------------------
+    # Redirect after successful login
+    # --------------------------------------------------
 
-    return {
-        "message": "Google Gmail authorization successful",
-        "email": user_email,
-        "token_type": "Bearer",
-        "refresh_token": bool(credentials.refresh_token),
-        "scopes": credentials.scopes,
-    }
+    response = RedirectResponse(
+        url=settings.frontend_url
+    )
+
+    response.set_cookie(
+        key="session_id",
+        value=session_id,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path="/",
+    )
+
+    return response

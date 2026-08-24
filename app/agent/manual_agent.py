@@ -13,13 +13,17 @@ from app.composition.dependencies import (
 
 class ManualAgent:
 
-    def __init__(self):
+    def __init__(self, credentials):
 
         self.model = create_llm()
 
-        self.registry = create_tool_registry()
+        self.registry = create_tool_registry(
+            credentials
+        )
 
-        self.executor = create_tool_executor()
+        self.executor = create_tool_executor(
+            credentials
+        )
 
         self.tool_calls = []
 
@@ -27,11 +31,14 @@ class ManualAgent:
             self.registry.get_all()
         )
 
-    def invoke(self, user_input: str):
+    def invoke(
+        self,
+        user_input: str,
+    ):
 
         messages = [
-SystemMessage(
-    content="""
+            SystemMessage(
+                content="""
 You are an email assistant.
 
 You have tools for searching, reading, and sending emails.
@@ -70,25 +77,37 @@ SEARCHING EMAILS:
 SENDING EMAILS:
 
 - Use `send_email` when the user asks to compose or send an email.
+- The `send_email` tool only prepares the email.
+- NEVER assume the email has been sent.
+- The user must explicitly confirm before the email is sent.
 """
-),
-            HumanMessage(content=user_input),
+            ),
+            HumanMessage(
+                content=user_input
+            ),
         ]
 
         generated_email = None
 
         while True:
 
-            response = self.model.invoke(messages)
+            response = self.model.invoke(
+                messages
+            )
 
-            print("\n===== LLM RESPONSE =====")
+            print(
+                "\n===== LLM RESPONSE ====="
+            )
             print(response)
-            print("========================\n")
+            print(
+                "========================\n"
+            )
 
             messages.append(response)
 
             # LLM is finished
             if not response.tool_calls:
+
                 return {
                     "response": response,
                     "email": generated_email,
@@ -97,16 +116,23 @@ SENDING EMAILS:
             # Execute requested tools
             for tool_call in response.tool_calls:
 
-                result = self.executor.execute(tool_call)
+                result = self.executor.execute(
+                    tool_call
+                )
 
-                print("\n===== TOOL RESULT =====")
+                print(
+                    "\n===== TOOL RESULT ====="
+                )
                 print(result)
                 print(type(result))
-                print("=======================\n")
+                print(
+                    "=======================\n"
+                )
 
-                # Capture the generated email
+                # Capture generated email
                 if tool_call["name"] == "send_email":
-                    generated_email = result
+
+                    generated_email = result["email"]
 
                 messages.append(
                     ToolMessage(

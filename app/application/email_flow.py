@@ -1,12 +1,18 @@
 from app.agent.manual_agent import ManualAgent
-from app.infrastructure.email.gmail import push_mail
 
 
-def process_email_request(user_input: str):
+def process_email_request(
+    user_input: str,
+    credentials,
+):
 
-    agent = ManualAgent()
+    agent = ManualAgent(
+        credentials
+    )
 
-    result = agent.invoke(user_input)
+    result = agent.invoke(
+        user_input
+    )
 
     email = result["email"]
 
@@ -16,21 +22,36 @@ def process_email_request(user_input: str):
             "message": "No email was generated.",
         }
 
-    # This object is what the UI will display
     return {
         "status": "preview",
         "email": email,
     }
 
 
-def confirm_and_send(email, confirmed: bool):
+def confirm_and_send(
+    email,
+    confirmed: bool,
+    credentials,
+):
 
     if not confirmed:
         return {
             "status": "cancelled",
         }
 
-    response = push_mail(email)
+    # Sending is now handled by GmailEmailSender
+    # through the authenticated user's credentials.
+    from app.infrastructure.email.gmail_sender import (
+        GmailEmailSender,
+    )
+
+    sender = GmailEmailSender(
+        credentials
+    )
+
+    response = sender.send(
+        email
+    )
 
     return {
         "status": "sent",

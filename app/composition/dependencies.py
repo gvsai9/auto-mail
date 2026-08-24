@@ -1,10 +1,20 @@
-from app.application.use_cases.search_emails import SearchEmailsUseCase
-from app.application.use_cases.send_email import SendEmailUseCase
+from app.application.use_cases.search_emails import (
+    SearchEmailsUseCase,
+)
+from app.application.use_cases.send_email import (
+    SendEmailUseCase,
+)
 
-from app.infrastructure.email.gmail_reader import GmailEmailReader
-from app.infrastructure.email.mock_sender import MockEmailSender
+from app.infrastructure.email.gmail_reader import (
+    GmailEmailReader,
+)
+from app.infrastructure.email.gmail_sender import (
+    GmailEmailSender,
+)
 
-from app.infrastructure.llm.nvidia_provider import NVIDIAProvider
+from app.infrastructure.llm.nvidia_provider import (
+    NVIDIAProvider,
+)
 from app.infrastructure.llm.email_content_generator import (
     LLMEmailContentGenerator,
 )
@@ -12,17 +22,29 @@ from app.infrastructure.llm.email_content_generator import (
 from app.application.schemas.llm import LLMConfig
 
 from app.agent.tools.registry import ToolRegistry
-from app.agent.tools.search_email import create_search_email_tool
-from app.agent.tools.read_email import create_read_email_tool
-from app.agent.tools.send_email import create_send_email_tool
+from app.agent.tools.search_email import (
+    create_search_email_tool,
+)
+from app.agent.tools.read_email import (
+    create_read_email_tool,
+)
+from app.agent.tools.send_email import (
+    create_send_email_tool,
+)
 
 
 class ToolExecutor:
 
-    def __init__(self, registry: ToolRegistry):
+    def __init__(
+        self,
+        registry: ToolRegistry,
+    ):
         self.registry = registry
 
-    def execute(self, tool_call: dict):
+    def execute(
+        self,
+        tool_call: dict,
+    ):
 
         tool = self.registry.get(
             tool_call["name"]
@@ -43,7 +65,9 @@ def create_llm():
 
     provider = NVIDIAProvider()
 
-    return provider.create_model(config)
+    return provider.create_model(
+        config
+    )
 
 
 def create_email_content_generator():
@@ -56,20 +80,30 @@ def create_email_content_generator():
     )
 
 
-def create_search_email_use_case():
+def create_search_email_use_case(
+    credentials,
+):
 
-    reader = GmailEmailReader()
+    reader = GmailEmailReader(
+        credentials
+    )
 
     return SearchEmailsUseCase(
         reader
     )
 
 
-def create_send_email_use_case():
+def create_send_email_use_case(
+    credentials,
+):
 
-    sender = MockEmailSender()
+    sender = GmailEmailSender(
+        credentials
+    )
 
-    content_generator = create_email_content_generator()
+    content_generator = (
+        create_email_content_generator()
+    )
 
     return SendEmailUseCase(
         sender=sender,
@@ -77,28 +111,57 @@ def create_send_email_use_case():
     )
 
 
-def create_tool_registry():
+def create_tool_registry(
+    credentials,
+):
 
-    reader = GmailEmailReader()
+    # -----------------------------
+    # Gmail Reader
+    # -----------------------------
 
+    reader = GmailEmailReader(
+        credentials
+    )
+
+    # -----------------------------
     # Search
-    search_use_case = create_search_email_use_case()
+    # -----------------------------
+
+    search_use_case = (
+        create_search_email_use_case(
+            credentials
+        )
+    )
 
     search_tool = create_search_email_tool(
         search_use_case
     )
 
+    # -----------------------------
     # Read
+    # -----------------------------
+
     read_tool = create_read_email_tool(
         reader
     )
 
+    # -----------------------------
     # Send
-    send_use_case = create_send_email_use_case()
+    # -----------------------------
+
+    send_use_case = (
+        create_send_email_use_case(
+            credentials
+        )
+    )
 
     send_tool = create_send_email_tool(
         send_use_case
     )
+
+    # -----------------------------
+    # Registry
+    # -----------------------------
 
     return ToolRegistry([
         search_tool,
@@ -107,8 +170,14 @@ def create_tool_registry():
     ])
 
 
-def create_tool_executor():
+def create_tool_executor(
+    credentials,
+):
 
-    registry = create_tool_registry()
+    registry = create_tool_registry(
+        credentials
+    )
 
-    return ToolExecutor(registry)
+    return ToolExecutor(
+        registry
+    )

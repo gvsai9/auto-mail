@@ -1,19 +1,15 @@
 import base64
+from email.utils import parsedate_to_datetime
 
 from googleapiclient.discovery import build
 
 from app.application.interfaces.email_reader import EmailReader
 from app.domain.models.email import Email
-from app.infrastructure.email.gmail_auth import (
-    get_gmail_credentials,
-)
-from email.utils import parsedate_to_datetime
+
 
 class GmailEmailReader(EmailReader):
 
-    def __init__(self):
-
-        credentials = get_gmail_credentials()
+    def __init__(self, credentials):
 
         self.service = build(
             "gmail",
@@ -43,19 +39,26 @@ class GmailEmailReader(EmailReader):
             .execute()
         )
 
-        messages = response.get("messages", [])
+        messages = response.get(
+            "messages",
+            []
+        )
 
         emails = []
 
         for message in messages:
 
             try:
-                email = self.read(message["id"])
+
+                email = self.read(
+                    message["id"]
+                )
 
                 if email:
                     emails.append(email)
 
             except Exception as exc:
+
                 print(
                     f"Failed to read Gmail message "
                     f"{message['id']}: {exc}"
@@ -79,31 +82,55 @@ class GmailEmailReader(EmailReader):
             .execute()
         )
 
-        payload = response.get("payload", {})
+        payload = response.get(
+            "payload",
+            {}
+        )
 
-        headers = payload.get("headers", [])
+        headers = payload.get(
+            "headers",
+            []
+        )
 
         header_map = {
             header["name"].lower(): header["value"]
             for header in headers
         }
 
-        sender = header_map.get("from", "")
-        subject = header_map.get("subject", "")
-        date_header = header_map.get("date")
+        sender = header_map.get(
+            "from",
+            ""
+        )
+
+        subject = header_map.get(
+            "subject",
+            ""
+        )
+
+        date_header = header_map.get(
+            "date"
+        )
 
         timestamp = (
-            parsedate_to_datetime(date_header)
+            parsedate_to_datetime(
+                date_header
+            )
             if date_header
             else None
         )
-        body = self._extract_body(payload)
+
+        body = self._extract_body(
+            payload
+        )
 
         recipients = []
 
-        to_header = header_map.get("to")
+        to_header = header_map.get(
+            "to"
+        )
 
         if to_header:
+
             recipients = [
                 recipient.strip()
                 for recipient in to_header.split(",")
@@ -123,21 +150,42 @@ class GmailEmailReader(EmailReader):
         payload,
     ) -> str:
 
-        body = payload.get("body", {})
+        body = payload.get(
+            "body",
+            {}
+        )
 
-        data = body.get("data")
+        data = body.get(
+            "data"
+        )
 
         if data:
-            return self._decode_body(data)
 
-        for part in payload.get("parts", []):
+            return self._decode_body(
+                data
+            )
 
-            if part.get("mimeType") == "text/plain":
+        for part in payload.get(
+            "parts",
+            []
+        ):
 
-                data = part.get("body", {}).get("data")
+            if part.get(
+                "mimeType"
+            ) == "text/plain":
+
+                data = part.get(
+                    "body",
+                    {}
+                ).get(
+                    "data"
+                )
 
                 if data:
-                    return self._decode_body(data)
+
+                    return self._decode_body(
+                        data
+                    )
 
         return ""
 
