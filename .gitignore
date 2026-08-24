@@ -1,0 +1,33 @@
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables
+.env
+
+# Google OAuth credentials
+credentials.json
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Pytest
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+.env
+venv/
+__pycache__/
+.pytest_cache/
+
+credentials.json
+google_client_secret.json
+token.json
+
+*.pyc

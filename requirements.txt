@@ -1,0 +1,30 @@
+# LLM / Agent
+langchain
+langchain-openai
+langgraph
+
+# Google Gmail API
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+
+# API
+fastapi
+uvicorn
+
+# Configuration / Validation
+pydantic
+pydantic-settings
+python-dotenv
+
+# Observability
+langsmith
+
+# Testing
+pytest
+pytest-asyncio
+
+# Code Quality
+ruff
+mypy
