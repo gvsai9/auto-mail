@@ -9,7 +9,10 @@ app = FastAPI(
     title="Email Agent API",
 )
 
-
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+    
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
