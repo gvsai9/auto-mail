@@ -179,7 +179,7 @@ def google_callback(
         value=session_id,
         httponly=True,
         secure=False,
-        samesite="lax",
+        samesite="none",
         path="/",
     )
 
