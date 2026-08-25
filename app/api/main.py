@@ -16,7 +16,7 @@ def health():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://agentic-mail.lovable.app",
+        "https://agent-mail.lovable.app/",
     ],
     allow_credentials=True,
     allow_methods=["*"],
