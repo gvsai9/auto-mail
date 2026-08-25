@@ -12,11 +12,11 @@ app = FastAPI(
 @app.get("/health")
 def health():
     return {"status": "ok"}
-    
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://autocompose.lovable.app",
+        "https://agentic-mail.lovable.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
